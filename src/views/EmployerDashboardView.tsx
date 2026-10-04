@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Job, Application, ApplicationStatus, User, Company } from '../types';
+import { Job, Application, ApplicationStatus, User, Company, InterviewSlot } from '../types';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { SalaryAnalytics } from '../components/SalaryAnalytics';
+import { InterviewScheduler } from '../components/InterviewScheduler';
 import {
   ResponsiveContainer,
   BarChart,
@@ -38,7 +40,7 @@ import {
 } from 'lucide-react';
 
 interface EmployerDashboardViewProps {
-  initialTab?: 'jobs' | 'applicants' | 'resumes' | 'company';
+  initialTab?: 'jobs' | 'applicants' | 'interviews' | 'salary-trends' | 'resumes' | 'company';
   onOpenPostJob: (jobToEdit?: Job) => void;
   onOpenMessages: (recipientId?: string, recipientName?: string) => void;
 }
@@ -49,7 +51,9 @@ export const EmployerDashboardView: React.FC<EmployerDashboardViewProps> = ({
   onOpenMessages,
 }) => {
   const { user, company, updateCompanyProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'jobs' | 'applicants' | 'resumes' | 'company'>(initialTab);
+  const [activeTab, setActiveTab] = useState<
+    'jobs' | 'applicants' | 'interviews' | 'salary-trends' | 'resumes' | 'company'
+  >(initialTab);
 
   useEffect(() => {
     if (initialTab) {
@@ -212,6 +216,30 @@ export const EmployerDashboardView: React.FC<EmployerDashboardViewProps> = ({
     }
   };
 
+  const handleUpdateInterviewSlots = async (
+    applicantId: string,
+    status: 'interview',
+    slots: InterviewSlot[],
+    note?: string
+  ) => {
+    try {
+      const nextDate = slots.length > 0 ? slots[0].dateTime : undefined;
+      const updated = await api.updateApplicationStatus(applicantId, {
+        status,
+        note: note || 'Updated interview invitation slots',
+        interviewDate: nextDate,
+        interviewSlots: slots,
+      });
+
+      setApplicants((prev) =>
+        prev.map((a) => (a.id === applicantId ? { ...a, ...updated } : a))
+      );
+    } catch (err: any) {
+      console.error('Failed to update interview slots:', err);
+      throw err;
+    }
+  };
+
   const handleSearchResumeDatabase = async (e: React.FormEvent) => {
     e.preventDefault();
     setSearchingResumes(true);
@@ -326,6 +354,37 @@ export const EmployerDashboardView: React.FC<EmployerDashboardViewProps> = ({
         >
           <Users className="w-4 h-4" />
           Applicants ({applicants.length})
+        </button>
+
+        <button
+          id="employer-tab-interviews"
+          onClick={() => setActiveTab('interviews')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${
+            activeTab === 'interviews'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          Interview Scheduler
+          {applicants.filter((a) => a.interviewSlots && a.interviewSlots.length > 0).length > 0 && (
+            <span className="px-1.5 py-0.2 bg-indigo-100 text-indigo-800 text-[10px] rounded-full font-bold">
+              {applicants.filter((a) => a.interviewSlots && a.interviewSlots.length > 0).length}
+            </span>
+          )}
+        </button>
+
+        <button
+          id="employer-tab-salary-trends"
+          onClick={() => setActiveTab('salary-trends')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${
+            activeTab === 'salary-trends'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4" />
+          Salary Trends
         </button>
 
         <button
@@ -720,7 +779,7 @@ export const EmployerDashboardView: React.FC<EmployerDashboardViewProps> = ({
         </div>
       )}
 
-      {/* Tab 2: Applicant Review */}
+      {/* Tab: Applicants */}
       {activeTab === 'applicants' && (
         <div className="space-y-4">
           {/* Filters */}
@@ -827,9 +886,18 @@ export const EmployerDashboardView: React.FC<EmployerDashboardViewProps> = ({
 
                   {/* Scheduled Interview Banner */}
                   {app.interviewDate && (
-                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>Interview scheduled for: {new Date(app.interviewDate).toLocaleString()}</span>
+                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>Interview scheduled for: {new Date(app.interviewDate).toLocaleString()}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('interviews')}
+                        className="text-xs font-semibold text-emerald-700 hover:underline"
+                      >
+                        View in Scheduler &rarr;
+                      </button>
                     </div>
                   )}
 
@@ -893,6 +961,23 @@ export const EmployerDashboardView: React.FC<EmployerDashboardViewProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {/* Tab: Interview Scheduler */}
+      {activeTab === 'interviews' && (
+        <InterviewScheduler
+          applicants={applicants}
+          onUpdateApplicantStatus={handleUpdateInterviewSlots}
+          onOpenMessages={onOpenMessages}
+        />
+      )}
+
+      {/* Tab: Salary Trends (Recharts) */}
+      {activeTab === 'salary-trends' && (
+        <SalaryAnalytics
+          jobs={postedJobs}
+          allMarketJobs={allMarketJobs}
+        />
       )}
 
       {/* Tab 3: Search Resume Database */}

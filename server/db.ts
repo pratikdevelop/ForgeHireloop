@@ -1,5 +1,3 @@
-import fs from 'fs';
-import path from 'path';
 import bcrypt from 'bcryptjs';
 import {
   User,
@@ -21,15 +19,6 @@ interface DatabaseSchema {
   messages: Message[];
   categories: PlatformCategory[];
   flagged: FlaggedContent[];
-}
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const DB_FILE = path.join(DATA_DIR, 'db.json');
-
-function ensureDataDirectory() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
 }
 
 function getInitialSeedData(): DatabaseSchema {
@@ -630,31 +619,7 @@ class Database {
   private data: DatabaseSchema;
 
   constructor() {
-    ensureDataDirectory();
-    this.data = this.loadData();
-  }
-
-  private loadData(): DatabaseSchema {
-    try {
-      if (fs.existsSync(DB_FILE)) {
-        const fileContent = fs.readFileSync(DB_FILE, 'utf-8');
-        return JSON.parse(fileContent);
-      }
-    } catch (err) {
-      console.error('Error reading database file, resetting to initial seed:', err);
-    }
-    const initial = getInitialSeedData();
-    this.persist(initial);
-    return initial;
-  }
-
-  private persist(dataToSave: DatabaseSchema = this.data) {
-    try {
-      ensureDataDirectory();
-      fs.writeFileSync(DB_FILE, JSON.stringify(dataToSave, null, 2), 'utf-8');
-    } catch (err) {
-      console.error('Failed to persist database to file:', err);
-    }
+    this.data = getInitialSeedData();
   }
 
   // Users
@@ -663,7 +628,6 @@ class Database {
   getUserByEmail(email: string) { return this.data.users.find(u => u.email.toLowerCase() === email.toLowerCase()); }
   createUser(user: User) {
     this.data.users.push(user);
-    this.persist();
     return user;
   }
   updateUser(id: string, updates: Partial<User>) {
@@ -674,7 +638,6 @@ class Database {
       ...updates,
       updatedAt: new Date().toISOString(),
     };
-    this.persist();
     return this.data.users[idx];
   }
 
@@ -683,7 +646,6 @@ class Database {
   getCompanyById(id: string) { return this.data.companies.find(c => c.id === id); }
   createCompany(company: Company) {
     this.data.companies.push(company);
-    this.persist();
     return company;
   }
   updateCompany(id: string, updates: Partial<Company>) {
@@ -694,7 +656,6 @@ class Database {
       ...updates,
       updatedAt: new Date().toISOString(),
     };
-    this.persist();
     return this.data.companies[idx];
   }
 
@@ -713,7 +674,6 @@ class Database {
   }
   createJob(job: Job) {
     this.data.jobs.unshift(job);
-    this.persist();
     return this.getJobById(job.id);
   }
   updateJob(id: string, updates: Partial<Job>) {
@@ -724,14 +684,12 @@ class Database {
       ...updates,
       updatedAt: new Date().toISOString(),
     };
-    this.persist();
     return this.getJobById(id);
   }
   deleteJob(id: string) {
     const idx = this.data.jobs.findIndex(j => j.id === id);
     if (idx === -1) return false;
     this.data.jobs.splice(idx, 1);
-    this.persist();
     return true;
   }
 
@@ -773,7 +731,6 @@ class Database {
     if (job) {
       job.applicantCount = (job.applicantCount || 0) + 1;
     }
-    this.persist();
     return this.getApplicationById(app.id);
   }
   updateApplication(id: string, updates: Partial<Application>) {
@@ -784,7 +741,6 @@ class Database {
       ...updates,
       updatedAt: new Date().toISOString(),
     };
-    this.persist();
     return this.getApplicationById(id);
   }
 
@@ -797,14 +753,12 @@ class Database {
   }
   createAlert(alert: JobAlert) {
     this.data.alerts.push(alert);
-    this.persist();
     return alert;
   }
   deleteAlert(id: string, candidateId: string) {
     const idx = this.data.alerts.findIndex(a => a.id === id && a.candidateId === candidateId);
     if (idx === -1) return false;
     this.data.alerts.splice(idx, 1);
-    this.persist();
     return true;
   }
 
@@ -814,25 +768,20 @@ class Database {
   }
   createMessage(msg: Message) {
     this.data.messages.push(msg);
-    this.persist();
     return msg;
   }
   markMessagesAsRead(senderId: string, recipientId: string) {
-    let changed = false;
     this.data.messages.forEach(m => {
       if (m.senderId === senderId && m.recipientId === recipientId && !m.read) {
         m.read = true;
-        changed = true;
       }
     });
-    if (changed) this.persist();
   }
 
   // Categories & Industries
   getCategories() { return this.data.categories; }
   addCategory(category: PlatformCategory) {
     this.data.categories.push(category);
-    this.persist();
     return category;
   }
 
@@ -842,13 +791,11 @@ class Database {
     const item = this.data.flagged.find(f => f.id === id);
     if (item) {
       item.status = status;
-      this.persist();
     }
     return item;
   }
   createFlag(flag: FlaggedContent) {
     this.data.flagged.push(flag);
-    this.persist();
     return flag;
   }
 }

@@ -109,6 +109,15 @@ export interface Job {
 
 export type ApplicationStatus = 'applied' | 'viewed' | 'shortlisted' | 'interview' | 'rejected' | 'hired';
 
+export interface InterviewSlot {
+  id: string;
+  dateTime: string;
+  durationMinutes: number;
+  meetingLink?: string;
+  notes?: string;
+  status: 'suggested' | 'accepted' | 'declined' | 'rescheduled';
+}
+
 export interface StatusHistoryItem {
   status: ApplicationStatus;
   timestamp: string;
@@ -127,6 +136,7 @@ export interface Application {
   statusHistory: StatusHistoryItem[];
   employerNotes?: string;
   interviewDate?: string;
+  interviewSlots?: InterviewSlot[];
   appliedAt: string;
   updatedAt: string;
   job?: Job;

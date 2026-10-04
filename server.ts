@@ -1,20 +1,14 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { apiRouter } from './server/routes';
 import { authenticateToken } from './server/auth';
 import { generateRobotsTxt, generateSitemapXml, renderPageWithSEO } from './server/seo';
 
-// Force new ForgeHireloop Firebase configuration and discard any legacy gen-lang-client project
-process.env.VITE_FIREBASE_API_KEY = "AIzaSyA_LdK4DgIIQdWC1efYAPj1ltkbxwBEB0o";
-process.env.VITE_FIREBASE_AUTH_DOMAIN = "forgehireloop.firebaseapp.com";
-process.env.VITE_FIREBASE_PROJECT_ID = "forgehireloop";
-process.env.VITE_FIREBASE_STORAGE_BUCKET = "forgehireloop.firebasestorage.app";
-process.env.VITE_FIREBASE_MESSAGING_SENDER_ID = "633018706293";
-process.env.VITE_FIREBASE_APP_ID = "1:633018706293:web:444f08918b605385914b3c";
-process.env.VITE_FIREBASE_MEASUREMENT_ID = "G-2HG1W1QK71";
-process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID = "(default)";
+// Load environment configuration from .env without hardcoded fallbacks
+dotenv.config();
 
 async function startServer() {
   const app = express();

@@ -84,6 +84,8 @@ export const ROUTE_PERMISSIONS: Record<string, { allowedRoles: UserRole[]; allow
   'manage-jobs': { allowedRoles: ['employer'] },
   'view-applicants': { allowedRoles: ['employer'] },
   'recruiter-applicants': { allowedRoles: ['employer'] },
+  'interviews': { allowedRoles: ['employer'] },
+  'salary-trends': { allowedRoles: ['employer'] },
   'resume-database': { allowedRoles: ['employer'] },
   'employer': { allowedRoles: ['employer'] },
 

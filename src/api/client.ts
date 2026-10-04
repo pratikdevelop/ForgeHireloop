@@ -12,25 +12,67 @@ import {
 } from '../types';
 import { firestoreService } from './firestoreService';
 import { auth, db } from '../firebase';
-import { collection, getDocs, doc, getDoc, updateDoc, setDoc, deleteDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+
+async function getAuthHeaders(): Promise<HeadersInit> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  try {
+    if (auth.currentUser) {
+      const token = await auth.currentUser.getIdToken();
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+    } else {
+      const cachedToken = localStorage.getItem('forgehireloop_token');
+      if (cachedToken) headers['Authorization'] = `Bearer ${cachedToken}`;
+    }
+  } catch {}
+  return headers;
+}
 
 export const api = {
   // ================= AUTH =================
   register: async (payload: any) => {
-    // Auth registration is performed directly in AuthContext via Firebase Auth.
-    // This fallback provides backwards compatibility if invoked directly.
-    return { token: 'firebase-token', user: payload, company: undefined };
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Registration failed');
+    return data;
   },
 
   login: async (payload: { email: string; password: string }) => {
-    return { token: 'firebase-token', user: {} as User, company: undefined };
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+    return data;
   },
 
   googleLogin: async (payload: any) => {
-    return { token: 'firebase-token', user: {} as User, company: undefined };
+    const res = await fetch('/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Google login failed');
+    return data;
   },
 
   getMe: async () => {
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/auth/me', { headers });
+    if (res.ok) {
+      const data = await res.json();
+      return { user: data.user, company: data.company };
+    }
+
     const currentUser = auth.currentUser;
     if (!currentUser) throw new Error('Not authenticated');
     let user = await firestoreService.getUser(currentUser.uid);
@@ -47,56 +89,63 @@ export const api = {
     if (user.companyId) {
       const comp = await firestoreService.getCompany(user.companyId);
       if (comp) company = comp;
-      else {
-        const cachedComp = localStorage.getItem('forgehireloop_company');
-        if (cachedComp) {
-          try {
-            company = JSON.parse(cachedComp);
-          } catch {}
-        }
-      }
     }
     return { user, company };
   },
 
   updateProfile: async (updates: Partial<User>) => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) throw new Error('Not authenticated');
-    await firestoreService.updateUser(currentUser.uid, updates);
-    const user = await firestoreService.getUser(currentUser.uid);
-    return { user: user!, company: undefined };
-  },
-
-  uploadResume: async (payload: { resumeUrl: string; resumeFileName: string }) => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) throw new Error('Not authenticated');
-    await firestoreService.updateUser(currentUser.uid, {
-      resumeUrl: payload.resumeUrl,
-      resumeFileName: payload.resumeFileName,
-      resumeUploadedAt: new Date().toISOString(),
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/auth/profile', {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(updates),
     });
-    const user = await firestoreService.getUser(currentUser.uid);
-    return { message: 'Resume uploaded successfully', user: user! };
+    if (res.ok) {
+      const data = await res.json();
+      return data.user;
+    }
+    // Fallback direct user update
+    if (auth.currentUser) {
+      return await firestoreService.setUser(auth.currentUser.uid, updates);
+    }
+    throw new Error('Not authenticated');
   },
 
-  // ================= JOBS =================
-  getJobs: async (params?: Record<string, any>) => {
-    await firestoreService.ensureInitialData();
-    const jobs = await firestoreService.getJobs({
-      keyword: params?.search || params?.keyword,
-      location: params?.location,
-      jobType: params?.jobType,
-      experienceLevel: params?.experienceLevel,
-      workplaceType: params?.workplaceType,
-      industry: params?.industry,
-      status: params?.status || 'active',
-      limitCount: params?.limit ? Number(params.limit) : undefined,
+  updateCompanyProfile: async (updates: Partial<Company>) => {
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/companies/my', {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(updates),
     });
-    return { count: jobs.length, jobs };
+    if (res.ok) {
+      return await res.json();
+    }
+    if (updates.id) {
+      return await firestoreService.setCompany(updates.id, updates);
+    }
+    throw new Error('Company ID required');
   },
 
-  getJobRecommendations: async () => {
-    await firestoreService.ensureInitialData();
+  // ================= PUBLIC READS (FIRESTORE DIRECT READS) =================
+  getJobs: async (filters?: {
+    search?: string;
+    location?: string;
+    workplaceType?: string;
+    jobType?: string;
+    experienceLevel?: string;
+    category?: string;
+    salaryMin?: number;
+    companyId?: string;
+  }) => {
+    return await firestoreService.getJobs(filters);
+  },
+
+  getFeaturedJobs: async () => {
+    return await firestoreService.getFeaturedJobs();
+  },
+
+  getRecommendedJobs: async () => {
     const allJobs = await firestoreService.getJobs({ status: 'active' });
     return { recommendations: allJobs.slice(0, 6) };
   },
@@ -108,55 +157,80 @@ export const api = {
   },
 
   getMyPostedJobs: async () => {
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/jobs/employer/mine', { headers });
+    if (res.ok) {
+      return await res.json();
+    }
     const currentUser = auth.currentUser;
     if (!currentUser) return [];
     const userDoc = await firestoreService.getUser(currentUser.uid);
     const companyId = userDoc?.companyId;
 
     if (!companyId) {
-      // Find jobs posted by this employer directly
       const allJobs = await firestoreService.getJobs();
       return allJobs.filter((j) => j.employerId === currentUser.uid);
     }
-
-    const companyJobs = await firestoreService.getJobs({ companyId });
-    return companyJobs;
+    return await firestoreService.getJobs({ companyId });
   },
 
+  // ================= JOB MUTATIONS (EXPRESS SERVER API) =================
   createJob: async (job: Partial<Job>) => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) throw new Error('You must be signed in as an employer to post jobs');
-    const userDoc = await firestoreService.getUser(currentUser.uid);
-
-    const created = await firestoreService.createJob({
-      ...job,
-      employerId: currentUser.uid,
-      companyId: userDoc?.companyId || job.companyId || 'comp_custom',
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/jobs', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(job),
     });
-    return created;
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to post job');
+    return data;
   },
 
   updateJob: async (id: string, updates: Partial<Job>) => {
-    await firestoreService.updateJob(id, updates);
-    const updated = await firestoreService.getJobById(id);
-    return updated!;
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/jobs/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(updates),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to update job');
+    return data;
   },
 
   updateJobStatus: async (id: string, payload: { status?: string; renew?: boolean }) => {
-    const updates: Partial<Job> = {};
-    if (payload.status) updates.status = payload.status as any;
-    if (payload.renew) updates.postedAt = new Date().toISOString();
-    await firestoreService.updateJob(id, updates);
-    const updated = await firestoreService.getJobById(id);
-    return updated!;
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/jobs/${encodeURIComponent(id)}/status`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to update job status');
+    return data;
   },
 
   deleteJob: async (id: string) => {
-    await firestoreService.deleteJob(id);
-    return { message: 'Job deleted successfully' };
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/jobs/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to delete job');
+    return data;
   },
 
   toggleSaveJob: async (id: string) => {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/jobs/${encodeURIComponent(id)}/save`, {
+      method: 'POST',
+      headers,
+    });
+    if (res.ok) {
+      return await res.json();
+    }
     const currentUser = auth.currentUser;
     if (!currentUser) throw new Error('Not authenticated');
     const userDoc = await firestoreService.getUser(currentUser.uid);
@@ -168,124 +242,100 @@ export const api = {
     return { savedJobIds: newSaved };
   },
 
-  // ================= APPLICATIONS =================
+  // ================= APPLICATIONS (EXPRESS SERVER API) =================
   applyToJob: async (
     jobId: string,
     payload: { resumeUrl?: string; resumeFileName?: string; coverNote?: string }
   ) => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) throw new Error('Please sign in to submit your application');
-    const userDoc = await firestoreService.getUser(currentUser.uid);
-    const job = await firestoreService.getJobById(jobId);
-    if (!job) throw new Error('Job not found');
-
-    const createdApp = await firestoreService.createApplication({
-      jobId,
-      companyId: job.companyId,
-      candidateId: currentUser.uid,
-      candidateName: userDoc?.name || currentUser.displayName || 'Candidate',
-      candidateEmail: userDoc?.email || currentUser.email || '',
-      candidateHeadline: userDoc?.headline,
-      candidatePhotoUrl: userDoc?.photoUrl || currentUser.photoURL || undefined,
-      resumeUrl: payload.resumeUrl || userDoc?.resumeUrl,
-      resumeFileName: payload.resumeFileName || userDoc?.resumeFileName,
-      coverNote: payload.coverNote,
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/apply`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
     });
-
-    return createdApp;
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to submit application');
+    return data;
   },
 
   getMyApplications: async () => {
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/applications/my', { headers });
+    if (res.ok) {
+      return await res.json();
+    }
     const currentUser = auth.currentUser;
     if (!currentUser) return [];
     return await firestoreService.getApplicationsForCandidate(currentUser.uid);
   },
 
   getEmployerApplications: async (params?: { jobId?: string; status?: string; skill?: string }) => {
+    const headers = await getAuthHeaders();
+    const query = new URLSearchParams();
+    if (params?.jobId) query.set('jobId', params.jobId);
+    if (params?.status) query.set('status', params.status);
+    if (params?.skill) query.set('skill', params.skill);
+
+    const res = await fetch(`/api/applications/employer?${query.toString()}`, { headers });
+    if (res.ok) {
+      return await res.json();
+    }
+
     const currentUser = auth.currentUser;
     if (!currentUser) return [];
     const userDoc = await firestoreService.getUser(currentUser.uid);
-    if (!userDoc?.companyId) {
-      // Look for applications across jobs posted by this employer
-      const myJobs = await firestoreService.getJobs();
-      const myJobIds = myJobs.filter((j) => j.employerId === currentUser.uid).map((j) => j.id);
-      if (myJobIds.length === 0) return [];
-      
-      const allAppsSnap = await getDocs(collection(db, 'applications'));
-      let apps = allAppsSnap.docs
-        .map((d) => ({ id: d.id, ...(d.data() as Omit<Application, 'id'>) }))
-        .filter((a) => myJobIds.includes(a.jobId));
-      return apps;
-    }
-
-    let apps = await firestoreService.getApplicationsForCompany(userDoc.companyId);
-
-    if (params?.jobId && params.jobId !== 'all') {
-      apps = apps.filter((a) => a.jobId === params.jobId);
-    }
-    if (params?.status && params.status !== 'all') {
-      apps = apps.filter((a) => a.status === params.status);
-    }
-    if (params?.skill) {
-      const sk = params.skill.toLowerCase();
-      apps = apps.filter((a) => a.candidate?.skills?.some((s) => s.toLowerCase().includes(sk)));
-    }
-
-    return apps;
+    if (!userDoc?.companyId) return [];
+    return await firestoreService.getApplicationsForCompany(userDoc.companyId);
   },
 
   updateApplicationStatus: async (
     id: string,
-    payload: { status: ApplicationStatus; note?: string; interviewDate?: string; employerNotes?: string }
-  ) => {
-    await firestoreService.updateApplicationStatus(id, payload.status, payload.note);
-    if (payload.interviewDate || payload.employerNotes) {
-      await updateDoc(doc(db, 'applications', id), {
-        ...(payload.interviewDate ? { interviewDate: payload.interviewDate } : {}),
-        ...(payload.employerNotes ? { employerNotes: payload.employerNotes } : {}),
-      });
+    payload: {
+      status: ApplicationStatus;
+      note?: string;
+      interviewDate?: string;
+      interviewSlots?: any[];
+      employerNotes?: string;
     }
-    const snap = await getDoc(doc(db, 'applications', id));
-    return { id: snap.id, ...(snap.data() as Omit<Application, 'id'>) };
+  ) => {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/applications/${encodeURIComponent(id)}/status`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to update application status');
+    return data;
   },
 
   // ================= RESUME SEARCH (EMPLOYER) =================
   searchCandidates: async (params?: { query?: string; keyword?: string; skill?: string; location?: string; minExperience?: number }) => {
-    const allUsers = await firestoreService.getAllUsers();
-    let candidates = allUsers.filter((u) => u.role === 'candidate');
+    const headers = await getAuthHeaders();
+    const query = new URLSearchParams();
+    if (params?.query) query.set('query', params.query);
+    if (params?.keyword) query.set('keyword', params.keyword);
+    if (params?.skill) query.set('skill', params.skill);
+    if (params?.location) query.set('location', params.location);
+    if (params?.minExperience) query.set('minExperience', String(params.minExperience));
 
-    const searchKeyword = (params?.query || params?.keyword || '').toLowerCase().trim();
-    if (searchKeyword) {
-      candidates = candidates.filter(
-        (c) =>
-          c.name?.toLowerCase().includes(searchKeyword) ||
-          c.headline?.toLowerCase().includes(searchKeyword) ||
-          c.skills?.some((s) => s.toLowerCase().includes(searchKeyword)) ||
-          c.bio?.toLowerCase().includes(searchKeyword)
-      );
+    const res = await fetch(`/api/candidates?${query.toString()}`, { headers });
+    if (res.ok) {
+      return await res.json();
     }
 
+    const users = await firestoreService.getAllUsers();
+    let candidates = users.filter((u) => u.role === 'candidate');
     if (params?.skill) {
       const sk = params.skill.toLowerCase();
       candidates = candidates.filter((c) => c.skills?.some((s) => s.toLowerCase().includes(sk)));
     }
-
-    if (params?.location) {
-      const loc = params.location.toLowerCase();
-      candidates = candidates.filter((c) => c.location?.toLowerCase().includes(loc));
-    }
-
-    if (params?.minExperience) {
-      candidates = candidates.filter((c) => (c.experienceYears || 0) >= Number(params.minExperience));
-    }
-
     return candidates;
   },
 
-  // ================= COMPANIES =================
-  getCompanies: async () => {
-    await firestoreService.ensureInitialData();
-    return await firestoreService.getCompanies();
+  // ================= COMPANIES (PUBLIC READS) =================
+  getCompanies: async (params?: { industry?: string; search?: string }) => {
+    return await firestoreService.getCompanies(params);
   },
 
   getCompanyById: async (id: string) => {
@@ -294,13 +344,15 @@ export const api = {
     return comp;
   },
 
-  updateCompany: async (id: string, updates: Partial<Company>) => {
-    const existing = await firestoreService.getCompany(id);
-    const merged = { ...(existing || {}), ...updates, id } as Company;
-    return await firestoreService.setCompany(merged);
-  },
-
   toggleFollowCompany: async (id: string) => {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/companies/${encodeURIComponent(id)}/follow`, {
+      method: 'POST',
+      headers,
+    });
+    if (res.ok) {
+      return await res.json();
+    }
     const currentUser = auth.currentUser;
     if (!currentUser) throw new Error('Not authenticated');
     const userDoc = await firestoreService.getUser(currentUser.uid);
@@ -312,202 +364,186 @@ export const api = {
     return { followedCompanyIds: newFollowed };
   },
 
-  // ================= ALERTS =================
+  // ================= JOB ALERTS (EXPRESS SERVER API) =================
   getAlerts: async () => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return [];
-    const snap = await getDocs(query(collection(db, 'alerts'), where('candidateId', '==', currentUser.uid)));
-    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<JobAlert, 'id'>) }));
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/alerts', { headers });
+    if (res.ok) {
+      return await res.json();
+    }
+    return [];
   },
 
   createAlert: async (alert: Partial<JobAlert>) => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) throw new Error('Not authenticated');
-    const id = `alert_${Date.now()}`;
-    const newAlert: JobAlert = {
-      id,
-      candidateId: currentUser.uid,
-      title: alert.title || 'Job Alert',
-      keywords: alert.keywords || '',
-      location: alert.location,
-      industry: alert.industry,
-      jobType: alert.jobType,
-      minSalary: alert.minSalary,
-      frequency: alert.frequency || 'weekly',
-      active: true,
-      createdAt: new Date().toISOString(),
-    };
-    await setDoc(doc(db, 'alerts', id), newAlert);
-    return newAlert;
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/alerts', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(alert),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to create alert');
+    return data;
   },
 
   deleteAlert: async (id: string) => {
-    await deleteDoc(doc(db, 'alerts', id));
-    return { message: 'Alert deleted' };
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/alerts/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers,
+    });
+    return await res.json();
   },
 
-  // ================= MESSAGES =================
+  // ================= MESSAGES (EXPRESS SERVER API) =================
   getMessages: async () => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return [];
-    const snap = await getDocs(collection(db, 'messages'));
-    const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Message, 'id'>) }));
-    return all.filter((m) => m.senderId === currentUser.uid || m.recipientId === currentUser.uid);
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/messages', { headers });
+    if (res.ok) {
+      return await res.json();
+    }
+    return [];
   },
 
   sendMessage: async (payload: { recipientId: string; content: string; applicationId?: string; jobId?: string }) => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) throw new Error('Not authenticated');
-    const userDoc = await firestoreService.getUser(currentUser.uid);
-    const id = `msg_${Date.now()}`;
-    const msg: Message = {
-      id,
-      applicationId: payload.applicationId,
-      jobId: payload.jobId,
-      senderId: currentUser.uid,
-      recipientId: payload.recipientId,
-      senderName: userDoc?.name || currentUser.displayName || 'User',
-      senderRole: userDoc?.role || 'candidate',
-      content: payload.content,
-      read: false,
-      createdAt: new Date().toISOString(),
-    };
-    await setDoc(doc(db, 'messages', id), msg);
-    return msg;
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/messages', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to send message');
+    return data;
   },
 
-  // ================= ADMIN =================
+  // ================= ADMIN & MODERATION (EXPRESS SERVER API) =================
   getAdminStats: async (): Promise<AdminStats> => {
-    const [users, jobs, companies, appsSnap] = await Promise.all([
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/admin/stats', { headers });
+    if (res.ok) {
+      return await res.json();
+    }
+    const [users, jobs, companies] = await Promise.all([
       firestoreService.getAllUsers(),
       firestoreService.getJobs(),
       firestoreService.getCompanies(),
-      getDocs(collection(db, 'applications')),
     ]);
-
-    const apps = appsSnap.docs.map((d) => d.data() as Application);
-
-    const statusCounts: Record<ApplicationStatus, number> = {
-      applied: 0,
-      viewed: 0,
-      shortlisted: 0,
-      interview: 0,
-      rejected: 0,
-      hired: 0,
-    };
-
-    apps.forEach((a) => {
-      if (a.status && statusCounts[a.status] !== undefined) {
-        statusCounts[a.status]++;
-      }
-    });
-
-    const categories: PlatformCategory[] = [
-      { id: 'cat_eng', name: 'Engineering', iconName: 'Code', jobCount: jobs.filter((j) => j.category === 'Engineering').length },
-      { id: 'cat_design', name: 'Design & Creative', iconName: 'Palette', jobCount: jobs.filter((j) => j.category === 'Design & Creative').length },
-      { id: 'cat_prod', name: 'Product Management', iconName: 'Compass', jobCount: jobs.filter((j) => j.category === 'Product Management').length },
-      { id: 'cat_devops', name: 'DevOps & Infrastructure', iconName: 'Server', jobCount: jobs.filter((j) => j.category === 'DevOps & Infrastructure').length },
-      { id: 'cat_data', name: 'Data & Analytics', iconName: 'BarChart', jobCount: jobs.filter((j) => j.category === 'Data & Analytics').length },
-    ];
 
     return {
       totalCandidates: users.filter((u) => u.role === 'candidate').length,
       totalEmployers: companies.length,
       totalJobs: jobs.length,
       activeJobs: jobs.filter((j) => j.status === 'active').length,
-      totalApplications: apps.length,
+      totalApplications: 0,
       pendingEmployers: companies.filter((c) => !c.verified).length,
-      statusCounts,
-      categories,
+      statusCounts: { applied: 0, viewed: 0, shortlisted: 0, interview: 0, rejected: 0, hired: 0 },
+      categories: [],
     };
   },
 
   getAdminEmployers: async () => {
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/admin/employers', { headers });
+    if (res.ok) return await res.json();
     return await firestoreService.getCompanies();
   },
 
   getAdminUsers: async () => {
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/admin/users', { headers });
+    if (res.ok) return await res.json();
     return await firestoreService.getAllUsers();
   },
 
   updateUserStatus: async (userId: string, isBanned: boolean) => {
-    const newStatus = isBanned ? 'banned' : 'active';
-    await firestoreService.updateUser(userId, { status: newStatus as any });
-    const user = await firestoreService.getUser(userId);
-    return user!;
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/status`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ status: isBanned ? 'banned' : 'active' }),
+    });
+    if (res.ok) return await res.json();
+    return await firestoreService.updateUser(userId, { status: isBanned ? 'banned' : 'active' });
   },
 
   getAdminJobs: async () => {
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/admin/jobs', { headers });
+    if (res.ok) return await res.json();
     return await firestoreService.getJobs();
   },
 
   approveEmployer: async (companyId: string, verified: boolean) => {
-    await updateDoc(doc(db, 'companies', companyId), { verified });
-    const comp = await firestoreService.getCompany(companyId);
-    return comp!;
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/admin/employers/${encodeURIComponent(companyId)}/verify`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ verified }),
+    });
+    if (res.ok) return await res.json();
+    return await firestoreService.setCompany(companyId, { verified });
   },
 
   verifyCompany: async (companyId: string, verified: boolean) => {
-    await updateDoc(doc(db, 'companies', companyId), { verified });
-    const comp = await firestoreService.getCompany(companyId);
-    return comp!;
+    return api.approveEmployer(companyId, verified);
   },
 
   getCategories: async () => {
-    const snap = await getDocs(collection(db, 'categories'));
-    if (snap.empty) {
-      return [
-        { id: 'cat_eng', name: 'Engineering', iconName: 'Code', jobCount: 12 },
-        { id: 'cat_design', name: 'Design & Creative', iconName: 'Palette', jobCount: 5 },
-        { id: 'cat_prod', name: 'Product Management', iconName: 'Compass', jobCount: 4 },
-        { id: 'cat_data', name: 'Data & Analytics', iconName: 'BarChart', jobCount: 7 },
-      ];
-    }
-    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<PlatformCategory, 'id'>) }));
+    const res = await fetch('/api/categories');
+    if (res.ok) return await res.json();
+    return [
+      { id: 'cat_eng', name: 'Engineering', iconName: 'Code', jobCount: 12 },
+      { id: 'cat_design', name: 'Design & Creative', iconName: 'Palette', jobCount: 5 },
+      { id: 'cat_prod', name: 'Product Management', iconName: 'Compass', jobCount: 4 },
+      { id: 'cat_data', name: 'Data & Analytics', iconName: 'BarChart', jobCount: 7 },
+    ];
   },
 
   createCategory: async (name: string, iconName?: string) => {
-    const id = `cat_${Date.now()}`;
-    const newCat: PlatformCategory = { id, name, iconName: iconName || 'Folder', jobCount: 0 };
-    await setDoc(doc(db, 'categories', id), newCat);
-    return newCat;
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/admin/categories', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ name, iconName }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to create category');
+    return data;
   },
 
   getFlaggedContent: async () => {
-    const snap = await getDocs(collection(db, 'flagged'));
-    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<FlaggedContent, 'id'>) }));
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/admin/flagged', { headers });
+    if (res.ok) return await res.json();
+    return [];
   },
 
   getAdminReports: async () => {
-    const snap = await getDocs(collection(db, 'flagged'));
-    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<FlaggedContent, 'id'>) }));
+    return api.getFlaggedContent();
   },
 
   updateFlaggedContent: async (id: string, status: 'resolved' | 'dismissed') => {
-    await updateDoc(doc(db, 'flagged', id), { status });
-    const snap = await getDoc(doc(db, 'flagged', id));
-    return { id: snap.id, ...(snap.data() as Omit<FlaggedContent, 'id'>) };
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/admin/flagged/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ status }),
+    });
+    return await res.json();
   },
 
   resolveReport: async (id: string, status: 'resolved' | 'dismissed') => {
-    await updateDoc(doc(db, 'flagged', id), { status });
-    const snap = await getDoc(doc(db, 'flagged', id));
-    return { id: snap.id, ...(snap.data() as Omit<FlaggedContent, 'id'>) };
+    return api.updateFlaggedContent(id, status);
   },
 
   reportContent: async (payload: { targetType: string; targetId: string; targetTitle?: string; reason: string }) => {
-    const id = `flag_${Date.now()}`;
-    const item: FlaggedContent = {
-      id,
-      targetType: payload.targetType as any,
-      targetId: payload.targetId,
-      targetTitle: payload.targetTitle || 'Reported Item',
-      reportedBy: auth.currentUser?.email || 'Anonymous',
-      reason: payload.reason,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    };
-    await setDoc(doc(db, 'flagged', id), item);
-    return item;
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/flagged', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
   },
 };

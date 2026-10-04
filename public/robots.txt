@@ -6,11 +6,13 @@ Allow: /jobs/*
 Allow: /companies
 Allow: /companies/*
 
-# Disallow sensitive paths and authenticated workspaces
+# Explicitly disallow private administrative and dashboard workspaces
 Disallow: /admin
 Disallow: /admin/*
 Disallow: /dashboard
 Disallow: /dashboard/*
+Disallow: /recruiter-dashboard
+Disallow: /recruiter-dashboard/*
 Disallow: /employer
 Disallow: /employer/*
 Disallow: /applications
@@ -20,4 +22,5 @@ Disallow: /candidate/*
 Disallow: /api/
 Disallow: /api/*
 
+# Reference to canonical sitemap
 Sitemap: https://forgehireloop.com/sitemap.xml

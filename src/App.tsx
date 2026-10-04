@@ -277,6 +277,8 @@ const AppContent: React.FC = () => {
           currentView === 'manage-jobs' ||
           currentView === 'view-applicants' ||
           currentView === 'recruiter-applicants' ||
+          currentView === 'interviews' ||
+          currentView === 'salary-trends' ||
           currentView === 'resume-database' ||
           currentView === 'post-job' ||
           currentView === 'employer') && (
@@ -290,6 +292,10 @@ const AppContent: React.FC = () => {
               initialTab={
                 currentView === 'recruiter-applicants' || currentView === 'view-applicants'
                   ? 'applicants'
+                  : currentView === 'interviews'
+                  ? 'interviews'
+                  : currentView === 'salary-trends'
+                  ? 'salary-trends'
                   : currentView === 'resume-database'
                   ? 'resumes'
                   : 'jobs'

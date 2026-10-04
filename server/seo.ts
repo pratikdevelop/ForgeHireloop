@@ -1,32 +1,10 @@
+import fs from 'fs';
 import { db } from './db';
 
 const BASE_URL = 'https://forgehireloop.com';
 
 export function generateRobotsTxt(): string {
-  return `# Robots.txt for ForgeHireloop
-User-agent: *
-Allow: /
-Allow: /jobs
-Allow: /jobs/*
-Allow: /companies
-Allow: /companies/*
-
-# Disallow sensitive paths and authenticated workspaces
-Disallow: /admin
-Disallow: /admin/*
-Disallow: /dashboard
-Disallow: /dashboard/*
-Disallow: /employer
-Disallow: /employer/*
-Disallow: /applications
-Disallow: /applications/*
-Disallow: /candidate
-Disallow: /candidate/*
-Disallow: /api/
-Disallow: /api/*
-
-Sitemap: ${BASE_URL}/sitemap.xml
-`;
+  return fs.readFileSync('robots.txt', 'utf-8');
 }
 
 export function generateSitemapXml(reqOrigin?: string): string {
