@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@keyframes buttonProgress {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(60%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+.animate-btn-progress {
+  animation: buttonProgress 1.3s ease-in-out infinite;
+}

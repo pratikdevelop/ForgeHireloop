@@ -1,0 +1,23 @@
+# Robots.txt for ForgeHireloop
+User-agent: *
+Allow: /
+Allow: /jobs
+Allow: /jobs/*
+Allow: /companies
+Allow: /companies/*
+
+# Disallow sensitive paths and authenticated workspaces
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /dashboard
+Disallow: /dashboard/*
+Disallow: /employer
+Disallow: /employer/*
+Disallow: /applications
+Disallow: /applications/*
+Disallow: /candidate
+Disallow: /candidate/*
+Disallow: /api/
+Disallow: /api/*
+
+Sitemap: https://forgehireloop.com/sitemap.xml

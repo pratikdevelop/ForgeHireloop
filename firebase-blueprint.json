@@ -1,0 +1,120 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account profile storing role, headline, bio, skills, experience, education, resume URL, and company association",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 120 },
+        "email": { "type": "string", "maxLength": 255 },
+        "role": { "type": "string", "enum": ["candidate", "employer", "admin"] },
+        "photoUrl": { "type": "string", "maxLength": 2048 },
+        "headline": { "type": "string", "maxLength": 200 },
+        "bio": { "type": "string", "maxLength": 2000 },
+        "location": { "type": "string", "maxLength": 120 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "skills": { "type": "array" },
+        "experience": { "type": "array" },
+        "education": { "type": "array" },
+        "resumeUrl": { "type": "string", "maxLength": 2048 },
+        "resumeFileName": { "type": "string", "maxLength": 255 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "savedJobIds": { "type": "array" },
+        "followedCompanyIds": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "Company": {
+      "title": "Company",
+      "description": "Hiring organization profile created and managed by employers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 160 },
+        "logoUrl": { "type": "string", "maxLength": 2048 },
+        "description": { "type": "string", "maxLength": 5000 },
+        "industry": { "type": "string", "maxLength": 100 },
+        "size": { "type": "string", "maxLength": 60 },
+        "location": { "type": "string", "maxLength": 120 },
+        "website": { "type": "string", "maxLength": 500 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "isVerified": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "createdBy"]
+    },
+    "Job": {
+      "title": "Job",
+      "description": "Active and closed employment listings posted by verified employers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "recruiterId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 10000 },
+        "requirements": { "type": "array" },
+        "location": { "type": "string", "maxLength": 120 },
+        "jobType": { "type": "string", "enum": ["Full-time", "Part-time", "Contract", "Internship", "Remote"] },
+        "workplaceType": { "type": "string", "enum": ["Remote", "Hybrid", "On-site"] },
+        "experienceLevel": { "type": "string", "enum": ["Entry Level", "Mid Level", "Senior Level", "Lead", "Director", "Executive"] },
+        "department": { "type": "string", "maxLength": 100 },
+        "salaryRange": { "type": "object" },
+        "salaryMin": { "type": "number" },
+        "salaryMax": { "type": "number" },
+        "skills": { "type": "array" },
+        "status": { "type": "string", "enum": ["active", "closed", "draft"] },
+        "applicantCount": { "type": "number" },
+        "postedAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "companyId", "recruiterId", "title", "status"]
+    },
+    "Application": {
+      "title": "Application",
+      "description": "Application submitted by a job seeker for a specific job",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "jobId": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "candidateId": { "type": "string", "maxLength": 128 },
+        "candidateName": { "type": "string", "maxLength": 120 },
+        "candidateEmail": { "type": "string", "maxLength": 255 },
+        "candidateHeadline": { "type": "string", "maxLength": 200 },
+        "candidatePhotoUrl": { "type": "string", "maxLength": 2048 },
+        "resumeUrl": { "type": "string", "maxLength": 2048 },
+        "resumeFileName": { "type": "string", "maxLength": 255 },
+        "coverNote": { "type": "string", "maxLength": 4000 },
+        "answers": { "type": "array" },
+        "status": { "type": "string", "enum": ["applied", "viewed", "shortlisted", "interview", "rejected", "hired"] },
+        "statusHistory": { "type": "array" },
+        "appliedAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "jobId", "candidateId", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile with role, contact info, skills, experience, and company reference"
+    },
+    "/companies/{companyId}": {
+      "schema": "Company",
+      "description": "Company profile created and managed by employer accounts"
+    },
+    "/jobs/{jobId}": {
+      "schema": "Job",
+      "description": "Job listings posted by companies and recruiters"
+    },
+    "/applications/{applicationId}": {
+      "schema": "Application",
+      "description": "Job applications submitted by candidates"
+    }
+  }
+}

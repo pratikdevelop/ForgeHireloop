@@ -1,0 +1,152 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all unknown paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'deepashsharma19@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isEmployer() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'employer'
+      );
+    }
+
+    function getUserCompanyId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Users Collection
+    // Candidates and employers manage their own user record; Admins can read for moderation; Employers can search candidate profiles
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin() || isEmployer() || (isSignedIn() && resource.data.role == 'employer');
+      allow list: if isAdmin() || isEmployer();
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidId(userId);
+      allow update: if isOwner(userId) && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) || isAdmin());
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Companies Collection
+    // Directory is publicly viewable; Only employers belonging to the company or creator can modify their own company
+    match /companies/{companyId} {
+      allow get, list: if true;
+      allow create: if isSignedIn() && isValidId(companyId);
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.createdBy == request.auth.uid ||
+        (isEmployer() && getUserCompanyId() == companyId)
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Jobs Collection
+    // Job listings are publicly readable; Only employers belonging to the company or recruiter can create/edit
+    match /jobs/{jobId} {
+      allow get, list: if true;
+      allow create: if isSignedIn() && isValidId(jobId) && (
+        isAdmin() || 
+        (isEmployer() && (
+          request.resource.data.employerId == request.auth.uid || 
+          request.resource.data.recruiterId == request.auth.uid ||
+          (getUserCompanyId() != null && request.resource.data.companyId == getUserCompanyId())
+        ))
+      );
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        (resource.data.employerId == request.auth.uid) ||
+        (resource.data.recruiterId == request.auth.uid) ||
+        (isEmployer() && getUserCompanyId() != null && getUserCompanyId() == resource.data.companyId)
+      );
+      allow delete: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.employerId == request.auth.uid ||
+        resource.data.recruiterId == request.auth.uid
+      );
+    }
+
+    // Applications Collection
+    // Candidates can only read/write their OWN applications — never another candidate's.
+    // Recruiters can only view and update applications for their OWN company's jobs.
+    match /applications/{applicationId} {
+      allow get: if isSignedIn() && (
+        resource.data.candidateId == request.auth.uid ||
+        isAdmin() ||
+        (isEmployer() && getUserCompanyId() != null && getUserCompanyId() == resource.data.companyId)
+      );
+
+      allow list: if isSignedIn() && (
+        resource.data.candidateId == request.auth.uid ||
+        isAdmin() ||
+        (isEmployer() && getUserCompanyId() != null && getUserCompanyId() == resource.data.companyId)
+      );
+
+      allow create: if isSignedIn() && 
+        isValidId(applicationId) && 
+        request.resource.data.candidateId == request.auth.uid;
+
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (resource.data.candidateId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coverNote', 'resumeUrl', 'resumeFileName', 'updatedAt'])) ||
+        (isEmployer() && getUserCompanyId() != null && getUserCompanyId() == resource.data.companyId &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'statusHistory', 'interviewDate', 'employerNotes', 'updatedAt']))
+      );
+
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.candidateId == request.auth.uid);
+    }
+
+    // Job Alerts Collection
+    match /alerts/{alertId} {
+      allow read, write: if isSignedIn() && (
+        request.auth.uid == resource.data.candidateId ||
+        (request.resource != null && request.resource.data.candidateId == request.auth.uid) ||
+        isAdmin()
+      );
+    }
+
+    // Messages Collection
+    match /messages/{messageId} {
+      allow read: if isSignedIn() && (
+        resource.data.senderId == request.auth.uid ||
+        resource.data.recipientId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid;
+      allow update: if isSignedIn() && (resource.data.recipientId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Admin Flagged Reports & Categories
+    match /flagged/{flagId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /categories/{catId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="fh-grad" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563EB" />
+      <stop offset="50%" stop-color="#4F46E5" />
+      <stop offset="100%" stop-color="#7C3AED" />
+    </linearGradient>
+    <linearGradient id="fh-loop" x1="16" y1="20" x2="48" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#60A5FA" />
+      <stop offset="100%" stop-color="#A78BFA" />
+    </linearGradient>
+  </defs>
+  <!-- Rounded Base -->
+  <rect width="64" height="64" rx="16" fill="url(#fh-grad)" />
+  
+  <!-- Briefcase handle -->
+  <path d="M26 21C26 18.2386 28.2386 16 31 16H33C35.7614 16 38 18.2386 38 21V23H26V21Z" stroke="white" stroke-width="2.5" stroke-linecap="round" />
+  
+  <!-- Briefcase body / loop structure -->
+  <rect x="15" y="23" width="34" height="25" rx="5" fill="#0F172A" fill-opacity="0.35" stroke="white" stroke-width="2.5" />
+  
+  <!-- Intersecting tech loop / nexus indicator -->
+  <path d="M22 34C22 30.6863 24.6863 28 28 28C31.3137 28 34 32 36 36C38 40 40.6863 44 44 44C47.3137 44 50 41.3137 50 38" stroke="url(#fh-loop)" stroke-width="3" stroke-linecap="round" />
+  
+  <!-- Core anchor point -->
+  <circle cx="32" cy="35.5" r="3" fill="white" />
+</svg>

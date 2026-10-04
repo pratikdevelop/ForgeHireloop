@@ -1,0 +1,6 @@
+{
+  "name": "ForgeHireloop",
+  "description": "Next-generation hiring and job discovery platform connecting exceptional engineering, product, and leadership talent with top tech companies.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

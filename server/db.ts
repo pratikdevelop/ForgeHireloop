@@ -1,0 +1,856 @@
+import fs from 'fs';
+import path from 'path';
+import bcrypt from 'bcryptjs';
+import {
+  User,
+  Company,
+  Job,
+  Application,
+  JobAlert,
+  Message,
+  PlatformCategory,
+  FlaggedContent,
+} from './types';
+
+interface DatabaseSchema {
+  users: User[];
+  companies: Company[];
+  jobs: Job[];
+  applications: Application[];
+  alerts: JobAlert[];
+  messages: Message[];
+  categories: PlatformCategory[];
+  flagged: FlaggedContent[];
+}
+
+const DATA_DIR = path.join(process.cwd(), 'data');
+const DB_FILE = path.join(DATA_DIR, 'db.json');
+
+function ensureDataDirectory() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+}
+
+function getInitialSeedData(): DatabaseSchema {
+  const salt = bcrypt.genSaltSync(10);
+  const passwordCandidate = bcrypt.hashSync('password123', salt);
+  const passwordEmployer = bcrypt.hashSync('password123', salt);
+  const passwordAdmin = bcrypt.hashSync('admin123', salt);
+
+  const users: User[] = [
+    {
+      id: 'usr_candidate_1',
+      email: 'sarah@example.com',
+      passwordHash: passwordCandidate,
+      name: 'Sarah Jenkins',
+      role: 'candidate',
+      status: 'active',
+      headline: 'Senior Frontend Engineer | React, TypeScript & Web Performance Specialist',
+      photoUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80',
+      phone: '+1 (555) 234-5678',
+      location: 'San Francisco, CA',
+      bio: 'Passionate frontend specialist with 6+ years of engineering interactive web applications, high-performance design systems, and modern SaaS user experiences.',
+      skills: ['React', 'TypeScript', 'Next.js', 'Tailwind CSS', 'Node.js', 'Redux', 'GraphQL', 'Jest', 'Vite'],
+      experienceYears: 6,
+      experience: [
+        {
+          id: 'exp_1',
+          title: 'Senior Frontend Developer',
+          company: 'Loomis Digital',
+          location: 'San Francisco, CA',
+          startDate: '2022-03',
+          current: true,
+          description: 'Architected responsive UI component libraries in TypeScript & Tailwind. Reduced initial bundle size by 35% and scaled design tokens across 4 teams.',
+        },
+        {
+          id: 'exp_2',
+          title: 'Frontend Engineer',
+          company: 'Nexus Innovations',
+          location: 'Remote',
+          startDate: '2019-06',
+          endDate: '2022-02',
+          current: false,
+          description: 'Built real-time client analytics dashboards using React and WebSockets. Collaborated closely with product designers to implement pixel-perfect micro-interactions.',
+        },
+      ],
+      education: [
+        {
+          id: 'edu_1',
+          degree: 'B.S. in Computer Science',
+          institution: 'University of California, Berkeley',
+          fieldOfStudy: 'Software Systems',
+          startYear: '2015',
+          endYear: '2019',
+        },
+      ],
+      resumeUrl: 'data:application/pdf;base64,JVBERi0xLjQKJcTl8uXrp/Og0MTGCjEgMCBvYmoKPDwKL1R5cGUgL0NhdGFsb2cKL1BhZ2VzIDIgMCBSCj4+CmVuZG9iag==',
+      resumeFileName: 'Sarah_Jenkins_Resume.pdf',
+      resumeUploadedAt: '2026-03-01T10:00:00Z',
+      savedJobIds: ['job_2', 'job_4'],
+      followedCompanyIds: ['comp_1', 'comp_2'],
+      createdAt: '2026-01-15T08:00:00Z',
+      updatedAt: '2026-03-01T10:00:00Z',
+    },
+    {
+      id: 'usr_candidate_2',
+      email: 'david@example.com',
+      passwordHash: passwordCandidate,
+      name: 'David Chen',
+      role: 'candidate',
+      status: 'active',
+      headline: 'Full Stack Engineer | Node.js, Python & Cloud Infrastructure',
+      photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
+      phone: '+1 (555) 987-6543',
+      location: 'New York, NY',
+      bio: 'Full stack engineer with 4 years building scalable APIs, distributed microservices, and database layers across high-growth startups.',
+      skills: ['Node.js', 'Python', 'React', 'Docker', 'PostgreSQL', 'Redis', 'AWS', 'REST APIs'],
+      experienceYears: 4,
+      experience: [
+        {
+          id: 'exp_d1',
+          title: 'Full Stack Engineer',
+          company: 'Aura Data Labs',
+          location: 'New York, NY',
+          startDate: '2022-08',
+          current: true,
+          description: 'Maintained core data ingestion APIs handling 10M+ daily events. Integrated Redis caching to cut p99 latencies from 320ms to 45ms.',
+        },
+      ],
+      education: [
+        {
+          id: 'edu_d1',
+          degree: 'B.S. in Information Systems',
+          institution: 'New York University',
+          startYear: '2018',
+          endYear: '2022',
+        },
+      ],
+      resumeUrl: 'data:application/pdf;base64,JVBERi0xLjQKJcTl8uXrp/Og0MTGCjEgMCBvYmoKPDwKL1R5cGUgL0NhdGFsb2cKL1BhZ2VzIDIgMCBSCj4+CmVuZG9iag==',
+      resumeFileName: 'David_Chen_Resume.pdf',
+      resumeUploadedAt: '2026-02-20T14:30:00Z',
+      savedJobIds: ['job_1'],
+      followedCompanyIds: ['comp_1'],
+      createdAt: '2026-02-10T09:00:00Z',
+      updatedAt: '2026-02-20T14:30:00Z',
+    },
+    {
+      id: 'usr_employer_1',
+      email: 'marcus@techflow.io',
+      passwordHash: passwordEmployer,
+      name: 'Marcus Vance',
+      role: 'employer',
+      status: 'active',
+      headline: 'Head of Talent Acquisition @ TechFlow Inc.',
+      photoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80',
+      phone: '+1 (555) 456-7890',
+      location: 'San Francisco, CA',
+      bio: 'Leading technical hiring and company culture scaling across frontend, backend, and machine learning teams at TechFlow.',
+      companyId: 'comp_1',
+      recruiterTitle: 'Head of Talent Acquisition',
+      createdAt: '2026-01-10T11:00:00Z',
+      updatedAt: '2026-01-10T11:00:00Z',
+    },
+    {
+      id: 'usr_employer_2',
+      email: 'elena@cloudscale.io',
+      passwordHash: passwordEmployer,
+      name: 'Elena Rostova',
+      role: 'employer',
+      status: 'active',
+      headline: 'Technical Recruiter @ CloudScale Systems',
+      photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80',
+      phone: '+1 (555) 789-0123',
+      location: 'Seattle, WA',
+      bio: 'Helping engineers find their dream teams at CloudScale Systems.',
+      companyId: 'comp_2',
+      recruiterTitle: 'Technical Recruiter',
+      createdAt: '2026-01-12T10:00:00Z',
+      updatedAt: '2026-01-12T10:00:00Z',
+    },
+    {
+      id: 'usr_employer_pending',
+      email: 'founders@vertexrobotics.com',
+      passwordHash: passwordEmployer,
+      name: 'Dr. Arthur Pendelton',
+      role: 'employer',
+      status: 'pending_approval',
+      headline: 'Founder & CTO @ Vertex Robotics',
+      photoUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&auto=format&fit=crop&q=80',
+      location: 'Austin, TX',
+      bio: 'Pioneering adaptive robotics algorithms for supply chain automation.',
+      companyId: 'comp_5',
+      recruiterTitle: 'Co-Founder',
+      createdAt: '2026-03-10T14:00:00Z',
+      updatedAt: '2026-03-10T14:00:00Z',
+    },
+    {
+      id: 'usr_admin_1',
+      email: 'admin@forgehireloop.com',
+      passwordHash: passwordAdmin,
+      name: 'Alex Morgan',
+      role: 'admin',
+      status: 'active',
+      headline: 'Platform Operations Administrator',
+      photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+      location: 'San Francisco, CA',
+      bio: 'ForgeHireloop platform integrity, employer verification, and community moderation manager.',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    },
+  ];
+
+  const companies: Company[] = [
+    {
+      id: 'comp_1',
+      name: 'TechFlow Inc.',
+      logoUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&auto=format&fit=crop&q=80',
+      bannerUrl: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&auto=format&fit=crop&q=80',
+      description: 'TechFlow empowers over 20,000 global enterprises with next-generation developer tooling, AI integrations, and real-time observability platforms.',
+      industry: 'Software & Technology',
+      size: '250-500 employees',
+      website: 'https://techflow.io',
+      location: 'San Francisco, CA (Remote Friendly)',
+      verified: true,
+      foundedYear: 2019,
+      employerIds: ['usr_employer_1'],
+      createdAt: '2026-01-05T00:00:00Z',
+      updatedAt: '2026-01-05T00:00:00Z',
+    },
+    {
+      id: 'comp_2',
+      name: 'CloudScale Systems',
+      logoUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=120&auto=format&fit=crop&q=80',
+      bannerUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&auto=format&fit=crop&q=80',
+      description: 'Next-generation cloud optimization and Kubernetes orchestration for mission-critical infrastructure.',
+      industry: 'Cloud & Infrastructure',
+      size: '100-250 employees',
+      website: 'https://cloudscale.io',
+      location: 'Seattle, WA',
+      verified: true,
+      foundedYear: 2021,
+      employerIds: ['usr_employer_2'],
+      createdAt: '2026-01-08T00:00:00Z',
+      updatedAt: '2026-01-08T00:00:00Z',
+    },
+    {
+      id: 'comp_3',
+      name: 'FinPulse Technologies',
+      logoUrl: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=120&auto=format&fit=crop&q=80',
+      bannerUrl: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1200&auto=format&fit=crop&q=80',
+      description: 'Modern banking APIs, fraud prevention algorithms, and cross-border payment infrastructure for the next generation of financial apps.',
+      industry: 'Fintech & Banking',
+      size: '500-1000 employees',
+      website: 'https://finpulse.com',
+      location: 'New York, NY',
+      verified: true,
+      foundedYear: 2017,
+      employerIds: [],
+      createdAt: '2026-01-10T00:00:00Z',
+      updatedAt: '2026-01-10T00:00:00Z',
+    },
+    {
+      id: 'comp_4',
+      name: 'HealthBridge Digital',
+      logoUrl: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=120&auto=format&fit=crop&q=80',
+      bannerUrl: 'https://images.unsplash.com/photo-1504813184591-01572f98c85f?w=1200&auto=format&fit=crop&q=80',
+      description: 'Connecting patients, clinics, and smart health monitors through secure HIPAA-compliant mobile telehealth solutions.',
+      industry: 'Healthcare & Biotech',
+      size: '50-100 employees',
+      website: 'https://healthbridge.org',
+      location: 'Boston, MA',
+      verified: true,
+      foundedYear: 2022,
+      employerIds: [],
+      createdAt: '2026-01-15T00:00:00Z',
+      updatedAt: '2026-01-15T00:00:00Z',
+    },
+    {
+      id: 'comp_5',
+      name: 'Vertex Robotics',
+      logoUrl: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=120&auto=format&fit=crop&q=80',
+      bannerUrl: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1200&auto=format&fit=crop&q=80',
+      description: 'Building autonomous warehouse transport robots with computer vision and machine learning safety systems.',
+      industry: 'Robotics & Hardware',
+      size: '20-50 employees',
+      website: 'https://vertexrobotics.ai',
+      location: 'Austin, TX',
+      verified: false, // pending admin approval!
+      foundedYear: 2024,
+      employerIds: ['usr_employer_pending'],
+      createdAt: '2026-03-10T14:00:00Z',
+      updatedAt: '2026-03-10T14:00:00Z',
+    },
+  ];
+
+  const jobs: Job[] = [
+    {
+      id: 'job_1',
+      companyId: 'comp_1',
+      employerId: 'usr_employer_1',
+      title: 'Senior React & TypeScript Engineer',
+      description: 'We are looking for a Senior React Engineer to lead the architecture of our core web dashboard. You will collaborate closely with product design and backend engineers to build seamless, accessible, and high-performance interactive interfaces used by thousands of engineering teams every day.',
+      requirements: [
+        '5+ years of experience with modern frontend frameworks (React, TypeScript)',
+        'Deep understanding of browser rendering performance, state management, and web vitals',
+        'Demonstrated ability to write clean, tested, and maintainable component libraries',
+        'Strong passion for accessibility (WCAG AA), responsive design, and developer ergonomics',
+      ],
+      responsibilities: [
+        'Design and implement robust user-facing workflows for our flagship analytics suite',
+        'Collaborate with UI/UX designers to evolve our Tailwind-based design system',
+        'Mentor junior engineers and champion code quality standards through thoughtful reviews',
+        'Investigate and optimize web performance bottlenecks',
+      ],
+      skills: ['React', 'TypeScript', 'Tailwind CSS', 'Next.js', 'Web Performance', 'GraphQL'],
+      location: 'San Francisco, CA',
+      workplaceType: 'remote',
+      jobType: 'full-time',
+      experienceLevel: 'senior',
+      minExperienceYears: 5,
+      salaryMin: 145000,
+      salaryMax: 180000,
+      salaryCurrency: 'USD',
+      salaryPeriod: 'yearly',
+      industry: 'Software & Technology',
+      category: 'Frontend Development',
+      status: 'active',
+      viewsCount: 248,
+      applicantCount: 18,
+      postedAt: '2026-03-01T12:00:00Z',
+      updatedAt: '2026-03-01T12:00:00Z',
+    },
+    {
+      id: 'job_2',
+      companyId: 'comp_2',
+      employerId: 'usr_employer_2',
+      title: 'Full Stack Node.js / Cloud Engineer',
+      description: 'Join CloudScale Systems to scale our backend microservices and developer portal. You will build high-throughput REST and gRPC services, manage PostgreSQL and Redis clusters, and deliver intuitive web administration tooling.',
+      requirements: [
+        '3+ years of backend or full-stack software development experience',
+        'Proficiency in Node.js / TypeScript and modern SQL databases (PostgreSQL)',
+        'Hands-on experience with Docker, container orchestration, and CI/CD pipelines',
+        'Comfortable working with React or similar modern frontend stacks',
+      ],
+      responsibilities: [
+        'Build scalable microservices handling thousands of concurrent requests',
+        'Design resilient database schemas and write optimized database migrations',
+        'Implement automated test suites and maintain 99.9% service uptime SLAs',
+      ],
+      skills: ['Node.js', 'TypeScript', 'PostgreSQL', 'Docker', 'React', 'AWS', 'Redis'],
+      location: 'Seattle, WA',
+      workplaceType: 'hybrid',
+      jobType: 'full-time',
+      experienceLevel: 'mid',
+      minExperienceYears: 3,
+      salaryMin: 125000,
+      salaryMax: 155000,
+      salaryCurrency: 'USD',
+      salaryPeriod: 'yearly',
+      industry: 'Cloud & Infrastructure',
+      category: 'Full Stack Development',
+      status: 'active',
+      viewsCount: 194,
+      applicantCount: 12,
+      postedAt: '2026-03-03T10:00:00Z',
+      updatedAt: '2026-03-03T10:00:00Z',
+    },
+    {
+      id: 'job_3',
+      companyId: 'comp_3',
+      employerId: 'usr_employer_1',
+      title: 'Lead Product Designer (Fintech)',
+      description: 'FinPulse is seeking a visionary Lead Product Designer to redefine financial checkout flows and enterprise banking dashboards. You will oversee end-to-end design systems from early discovery to high-fidelity prototypes and developer handoffs.',
+      requirements: [
+        '6+ years in digital product design, with prior fintech or enterprise SaaS experience',
+        'Mastery of Figma, component libraries, auto-layout, and interactive prototyping',
+        'Proven track record of conducting user research and synthesizing usability insights',
+      ],
+      responsibilities: [
+        'Lead the design of mobile and desktop banking products',
+        'Maintain and extend our unified design token architecture',
+        'Partner with product managers and engineers to deliver rapid iterative releases',
+      ],
+      skills: ['Figma', 'UI/UX Design', 'Design Systems', 'User Research', 'Prototyping'],
+      location: 'New York, NY',
+      workplaceType: 'remote',
+      jobType: 'full-time',
+      experienceLevel: 'lead',
+      minExperienceYears: 6,
+      salaryMin: 150000,
+      salaryMax: 185000,
+      salaryCurrency: 'USD',
+      salaryPeriod: 'yearly',
+      industry: 'Fintech & Banking',
+      category: 'Design & Creative',
+      status: 'active',
+      viewsCount: 312,
+      applicantCount: 22,
+      postedAt: '2026-02-28T09:00:00Z',
+      updatedAt: '2026-02-28T09:00:00Z',
+    },
+    {
+      id: 'job_4',
+      companyId: 'comp_1',
+      employerId: 'usr_employer_1',
+      title: 'DevOps & Site Reliability Engineer',
+      description: 'Help TechFlow scale its multi-region Kubernetes clusters across AWS and GCP. You will automate infrastructure using Terraform, implement zero-downtime deployment pipelines, and optimize observability telemetry.',
+      requirements: [
+        '4+ years managing production cloud infrastructure (AWS or GCP)',
+        'Expertise in Kubernetes, Helm, and Terraform Infrastructure as Code',
+        'Strong scripting skills in Python, Bash, or Go',
+      ],
+      responsibilities: [
+        'Maintain multi-cloud Kubernetes clusters with automated scaling',
+        'Manage Prometheus, Grafana, and OpenTelemetry monitoring pipelines',
+        'Participate in on-call rotations and lead incident retrospectives',
+      ],
+      skills: ['Kubernetes', 'Terraform', 'AWS', 'Docker', 'Prometheus', 'Python', 'CI/CD'],
+      location: 'San Francisco, CA',
+      workplaceType: 'remote',
+      jobType: 'full-time',
+      experienceLevel: 'senior',
+      minExperienceYears: 4,
+      salaryMin: 140000,
+      salaryMax: 175000,
+      salaryCurrency: 'USD',
+      salaryPeriod: 'yearly',
+      industry: 'Software & Technology',
+      category: 'DevOps & SRE',
+      status: 'active',
+      viewsCount: 165,
+      applicantCount: 8,
+      postedAt: '2026-03-05T14:30:00Z',
+      updatedAt: '2026-03-05T14:30:00Z',
+    },
+    {
+      id: 'job_5',
+      companyId: 'comp_4',
+      employerId: 'usr_employer_2',
+      title: 'Junior Frontend Developer',
+      description: 'Kickstart your healthcare tech career at HealthBridge Digital. You will contribute to our clinician web portal, building accessible patient interaction components and unit testing new features.',
+      requirements: [
+        '1+ years of experience or degree in CS/Web Development',
+        'Good foundation in JavaScript, HTML5, CSS3, and React fundamentals',
+        'Eager learner with strong communication and collaboration skills',
+      ],
+      responsibilities: [
+        'Develop responsive web pages using React and Tailwind',
+        'Write automated unit tests and fix reported UI bugs',
+        'Participate in daily standups and sprint planning',
+      ],
+      skills: ['React', 'JavaScript', 'HTML5', 'CSS3', 'Git', 'Tailwind CSS'],
+      location: 'Boston, MA',
+      workplaceType: 'onsite',
+      jobType: 'full-time',
+      experienceLevel: 'entry',
+      minExperienceYears: 1,
+      salaryMin: 70000,
+      salaryMax: 90000,
+      salaryCurrency: 'USD',
+      salaryPeriod: 'yearly',
+      industry: 'Healthcare & Biotech',
+      category: 'Frontend Development',
+      status: 'active',
+      viewsCount: 420,
+      applicantCount: 35,
+      postedAt: '2026-03-08T08:00:00Z',
+      updatedAt: '2026-03-08T08:00:00Z',
+    },
+    {
+      id: 'job_6',
+      companyId: 'comp_1',
+      employerId: 'usr_employer_1',
+      title: 'Machine Learning Research Engineer',
+      description: 'Join TechFlow AI labs to build code intelligence models and generative developer assistants. Work on fine-tuning state-of-the-art LLMs, evaluation harnesses, and low-latency inference serving.',
+      requirements: [
+        'MS or PhD in Computer Science, Machine Learning, or equivalent industry experience',
+        'Proficiency in PyTorch, Transformers library, and Python scientific stack',
+        'Experience deploying models with vLLM, TensorRT-LLM, or Triton inference server',
+      ],
+      responsibilities: [
+        'Develop domain-adapted language models for coding suggestions and code reviews',
+        'Build benchmark datasets and synthetic training data generation pipelines',
+        'Collaborate with platform engineers to optimize real-time inference latency',
+      ],
+      skills: ['Python', 'PyTorch', 'LLMs', 'Transformers', 'Machine Learning', 'Docker'],
+      location: 'San Francisco, CA',
+      workplaceType: 'hybrid',
+      jobType: 'full-time',
+      experienceLevel: 'senior',
+      minExperienceYears: 4,
+      salaryMin: 165000,
+      salaryMax: 210000,
+      salaryCurrency: 'USD',
+      salaryPeriod: 'yearly',
+      industry: 'Software & Technology',
+      category: 'Data & AI',
+      status: 'active',
+      viewsCount: 512,
+      applicantCount: 29,
+      postedAt: '2026-03-02T11:00:00Z',
+      updatedAt: '2026-03-02T11:00:00Z',
+    },
+  ];
+
+  const applications: Application[] = [
+    {
+      id: 'app_1',
+      jobId: 'job_1',
+      candidateId: 'usr_candidate_1',
+      companyId: 'comp_1',
+      resumeUrl: 'data:application/pdf;base64,JVBERi0xLjQKJcTl8uXrp/Og0MTGCjEgMCBvYmoKPDwKL1R5cGUgL0NhdGFsb2cKL1BhZ2VzIDIgMCBSCj4+CmVuZG9iag==',
+      resumeFileName: 'Sarah_Jenkins_Resume.pdf',
+      coverNote: 'I have 6 years building high-performance React and TypeScript applications. I would love to bring my experience in design systems and web performance to TechFlow!',
+      status: 'interview',
+      statusHistory: [
+        { status: 'applied', timestamp: '2026-03-02T14:15:00Z', note: 'Application submitted' },
+        { status: 'viewed', timestamp: '2026-03-03T09:30:00Z', note: 'Viewed by Marcus Vance' },
+        { status: 'shortlisted', timestamp: '2026-03-04T11:00:00Z', note: 'Shortlisted for technical review' },
+        { status: 'interview', timestamp: '2026-03-05T16:00:00Z', note: 'Technical screen scheduled for March 18' },
+      ],
+      employerNotes: 'Impressive GitHub and design systems background. Strong cultural fit.',
+      interviewDate: '2026-03-18T15:00:00Z',
+      appliedAt: '2026-03-02T14:15:00Z',
+      updatedAt: '2026-03-05T16:00:00Z',
+    },
+    {
+      id: 'app_2',
+      jobId: 'job_1',
+      candidateId: 'usr_candidate_2',
+      companyId: 'comp_1',
+      resumeUrl: 'data:application/pdf;base64,JVBERi0xLjQKJcTl8uXrp/Og0MTGCjEgMCBvYmoKPDwKL1R5cGUgL0NhdGFsb2cKL1BhZ2VzIDIgMCBSCj4+CmVuZG9iag==',
+      resumeFileName: 'David_Chen_Resume.pdf',
+      coverNote: 'Excited about TechFlow developer tools and high-scale architecture.',
+      status: 'shortlisted',
+      statusHistory: [
+        { status: 'applied', timestamp: '2026-03-03T11:00:00Z', note: 'Application submitted' },
+        { status: 'viewed', timestamp: '2026-03-03T15:20:00Z', note: 'Viewed by Recruiter' },
+        { status: 'shortlisted', timestamp: '2026-03-06T10:00:00Z', note: 'Solid backend and distributed systems experience' },
+      ],
+      appliedAt: '2026-03-03T11:00:00Z',
+      updatedAt: '2026-03-06T10:00:00Z',
+    },
+    {
+      id: 'app_3',
+      jobId: 'job_2',
+      candidateId: 'usr_candidate_1',
+      companyId: 'comp_2',
+      resumeUrl: 'data:application/pdf;base64,JVBERi0xLjQKJcTl8uXrp/Og0MTGCjEgMCBvYmoKPDwKL1R5cGUgL0NhdGFsb2cKL1BhZ2VzIDIgMCBSCj4+CmVuZG9iag==',
+      resumeFileName: 'Sarah_Jenkins_Resume.pdf',
+      coverNote: 'Interested in the full stack developer portal role at CloudScale.',
+      status: 'applied',
+      statusHistory: [
+        { status: 'applied', timestamp: '2026-03-04T10:00:00Z', note: 'Application submitted' },
+      ],
+      appliedAt: '2026-03-04T10:00:00Z',
+      updatedAt: '2026-03-04T10:00:00Z',
+    },
+  ];
+
+  const alerts: JobAlert[] = [
+    {
+      id: 'alert_1',
+      candidateId: 'usr_candidate_1',
+      title: 'Senior Frontend & React Jobs',
+      keywords: 'React TypeScript Frontend',
+      location: 'Remote',
+      jobType: 'full-time',
+      minSalary: 130000,
+      frequency: 'daily',
+      active: true,
+      createdAt: '2026-02-01T10:00:00Z',
+    },
+  ];
+
+  const messages: Message[] = [
+    {
+      id: 'msg_1',
+      applicationId: 'app_1',
+      jobId: 'job_1',
+      senderId: 'usr_employer_1',
+      recipientId: 'usr_candidate_1',
+      senderName: 'Marcus Vance',
+      senderRole: 'employer',
+      content: 'Hi Sarah, thank you for applying! We were very impressed by your track record in frontend architecture. Are you available for a 30-min intro chat this Thursday at 2 PM PST?',
+      read: true,
+      createdAt: '2026-03-05T16:05:00Z',
+    },
+    {
+      id: 'msg_2',
+      applicationId: 'app_1',
+      jobId: 'job_1',
+      senderId: 'usr_candidate_1',
+      recipientId: 'usr_employer_1',
+      senderName: 'Sarah Jenkins',
+      senderRole: 'candidate',
+      content: 'Hi Marcus! Yes, Thursday at 2 PM PST works great for me. Looking forward to speaking with you and the team.',
+      read: true,
+      createdAt: '2026-03-05T16:30:00Z',
+    },
+  ];
+
+  const categories: PlatformCategory[] = [
+    { id: 'cat_1', name: 'Frontend Development', iconName: 'Layout', jobCount: 142 },
+    { id: 'cat_2', name: 'Backend & APIs', iconName: 'Server', jobCount: 215 },
+    { id: 'cat_3', name: 'Full Stack Development', iconName: 'Layers', jobCount: 310 },
+    { id: 'cat_4', name: 'DevOps & SRE', iconName: 'Cloud', jobCount: 98 },
+    { id: 'cat_5', name: 'Data & AI / ML', iconName: 'Cpu', jobCount: 184 },
+    { id: 'cat_6', name: 'Design & Creative', iconName: 'Palette', jobCount: 86 },
+    { id: 'cat_7', name: 'Product Management', iconName: 'Briefcase', jobCount: 120 },
+    { id: 'cat_8', name: 'Quality Assurance', iconName: 'CheckCircle', jobCount: 54 },
+  ];
+
+  const flagged: FlaggedContent[] = [
+    {
+      id: 'flag_1',
+      targetType: 'employer',
+      targetId: 'comp_5',
+      targetTitle: 'Vertex Robotics (New Employer Account)',
+      reportedBy: 'System Auto-Audit',
+      reason: 'New company registration awaiting platform verification and business verification documents.',
+      status: 'pending',
+      createdAt: '2026-03-10T14:05:00Z',
+    },
+  ];
+
+  return {
+    users,
+    companies,
+    jobs,
+    applications,
+    alerts,
+    messages,
+    categories,
+    flagged,
+  };
+}
+
+class Database {
+  private data: DatabaseSchema;
+
+  constructor() {
+    ensureDataDirectory();
+    this.data = this.loadData();
+  }
+
+  private loadData(): DatabaseSchema {
+    try {
+      if (fs.existsSync(DB_FILE)) {
+        const fileContent = fs.readFileSync(DB_FILE, 'utf-8');
+        return JSON.parse(fileContent);
+      }
+    } catch (err) {
+      console.error('Error reading database file, resetting to initial seed:', err);
+    }
+    const initial = getInitialSeedData();
+    this.persist(initial);
+    return initial;
+  }
+
+  private persist(dataToSave: DatabaseSchema = this.data) {
+    try {
+      ensureDataDirectory();
+      fs.writeFileSync(DB_FILE, JSON.stringify(dataToSave, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('Failed to persist database to file:', err);
+    }
+  }
+
+  // Users
+  getUsers() { return this.data.users; }
+  getUserById(id: string) { return this.data.users.find(u => u.id === id); }
+  getUserByEmail(email: string) { return this.data.users.find(u => u.email.toLowerCase() === email.toLowerCase()); }
+  createUser(user: User) {
+    this.data.users.push(user);
+    this.persist();
+    return user;
+  }
+  updateUser(id: string, updates: Partial<User>) {
+    const idx = this.data.users.findIndex(u => u.id === id);
+    if (idx === -1) return null;
+    this.data.users[idx] = {
+      ...this.data.users[idx],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    this.persist();
+    return this.data.users[idx];
+  }
+
+  // Companies
+  getCompanies() { return this.data.companies; }
+  getCompanyById(id: string) { return this.data.companies.find(c => c.id === id); }
+  createCompany(company: Company) {
+    this.data.companies.push(company);
+    this.persist();
+    return company;
+  }
+  updateCompany(id: string, updates: Partial<Company>) {
+    const idx = this.data.companies.findIndex(c => c.id === id);
+    if (idx === -1) return null;
+    this.data.companies[idx] = {
+      ...this.data.companies[idx],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    this.persist();
+    return this.data.companies[idx];
+  }
+
+  // Jobs
+  getJobs() {
+    return this.data.jobs.map(job => {
+      const company = this.getCompanyById(job.companyId);
+      return { ...job, company };
+    });
+  }
+  getJobById(id: string) {
+    const job = this.data.jobs.find(j => j.id === id);
+    if (!job) return null;
+    const company = this.getCompanyById(job.companyId);
+    return { ...job, company };
+  }
+  createJob(job: Job) {
+    this.data.jobs.unshift(job);
+    this.persist();
+    return this.getJobById(job.id);
+  }
+  updateJob(id: string, updates: Partial<Job>) {
+    const idx = this.data.jobs.findIndex(j => j.id === id);
+    if (idx === -1) return null;
+    this.data.jobs[idx] = {
+      ...this.data.jobs[idx],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    this.persist();
+    return this.getJobById(id);
+  }
+  deleteJob(id: string) {
+    const idx = this.data.jobs.findIndex(j => j.id === id);
+    if (idx === -1) return false;
+    this.data.jobs.splice(idx, 1);
+    this.persist();
+    return true;
+  }
+
+  // Applications
+  getApplications() {
+    return this.data.applications.map(app => {
+      const job = this.getJobById(app.jobId);
+      const user = this.getUserById(app.candidateId);
+      const company = this.getCompanyById(app.companyId);
+      const candidateSummary = user ? {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        headline: user.headline,
+        photoUrl: user.photoUrl,
+        skills: user.skills,
+        experienceYears: user.experienceYears,
+        experience: user.experience,
+        education: user.education,
+        resumeUrl: user.resumeUrl,
+        resumeFileName: user.resumeFileName,
+        location: user.location,
+      } : undefined;
+      return {
+        ...app,
+        job,
+        company,
+        candidate: candidateSummary,
+      };
+    });
+  }
+  getApplicationById(id: string) {
+    return this.getApplications().find(a => a.id === id) || null;
+  }
+  createApplication(app: Application) {
+    this.data.applications.unshift(app);
+    // update job applicantCount
+    const job = this.data.jobs.find(j => j.id === app.jobId);
+    if (job) {
+      job.applicantCount = (job.applicantCount || 0) + 1;
+    }
+    this.persist();
+    return this.getApplicationById(app.id);
+  }
+  updateApplication(id: string, updates: Partial<Application>) {
+    const idx = this.data.applications.findIndex(a => a.id === id);
+    if (idx === -1) return null;
+    this.data.applications[idx] = {
+      ...this.data.applications[idx],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    this.persist();
+    return this.getApplicationById(id);
+  }
+
+  // Alerts
+  getAlerts(candidateId?: string) {
+    if (candidateId) {
+      return this.data.alerts.filter(a => a.candidateId === candidateId);
+    }
+    return this.data.alerts;
+  }
+  createAlert(alert: JobAlert) {
+    this.data.alerts.push(alert);
+    this.persist();
+    return alert;
+  }
+  deleteAlert(id: string, candidateId: string) {
+    const idx = this.data.alerts.findIndex(a => a.id === id && a.candidateId === candidateId);
+    if (idx === -1) return false;
+    this.data.alerts.splice(idx, 1);
+    this.persist();
+    return true;
+  }
+
+  // Messages
+  getMessages(userId: string) {
+    return this.data.messages.filter(m => m.senderId === userId || m.recipientId === userId);
+  }
+  createMessage(msg: Message) {
+    this.data.messages.push(msg);
+    this.persist();
+    return msg;
+  }
+  markMessagesAsRead(senderId: string, recipientId: string) {
+    let changed = false;
+    this.data.messages.forEach(m => {
+      if (m.senderId === senderId && m.recipientId === recipientId && !m.read) {
+        m.read = true;
+        changed = true;
+      }
+    });
+    if (changed) this.persist();
+  }
+
+  // Categories & Industries
+  getCategories() { return this.data.categories; }
+  addCategory(category: PlatformCategory) {
+    this.data.categories.push(category);
+    this.persist();
+    return category;
+  }
+
+  // Flagged Content
+  getFlagged() { return this.data.flagged; }
+  updateFlagged(id: string, status: 'resolved' | 'dismissed') {
+    const item = this.data.flagged.find(f => f.id === id);
+    if (item) {
+      item.status = status;
+      this.persist();
+    }
+    return item;
+  }
+  createFlag(flag: FlaggedContent) {
+    this.data.flagged.push(flag);
+    this.persist();
+    return flag;
+  }
+}
+
+export const db = new Database();
